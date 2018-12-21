@@ -44,23 +44,3 @@ you can check out the other options available to use `python main.py --help`
 |#Edges        |2126   |2148   |6594|
 |Average Degree|12.8072|14.4646|2.6691|
 |SEAL(**auc**)     |**0.9538**|**0.8979**|**0.8889**|
-=======
-
-`python main.py`
-
-#### 3.2 - Option
-
- - `python main.py --data Celegans` to run `SEAL` on data `Celegans`
- - `python main.py --epoch 200` will assign the number of epochs to 200, default value is 100
- - `python main.py -r 0.00001` will set the learning rate which determine the speed of update parameters to 0.00001.
- 
-you can check out the other options available to use `python main.py --help`
-
-## 4 - Result
-
-|Data| USAir | Celegans | Power |
-|:-----:|:-----:|:-----:|:-----:|
-|#Node         |332    |297    |4941|
-|#Edges        |2126   |2148   |6594|
-|Average Degree|12.8072|14.4646|2.6691|
-|SEAL(**auc**)     |**0.9538**|**0.8979**|**0.8889**|
