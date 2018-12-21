@@ -1,6 +1,6 @@
 # SEAL-for-link-prediction
 
-`SEAL, a link prediction framework based on [GNN](https://github.com/XuSShuai/GNN_tensorflow).`
+`SEAL, a link prediction framework based on` [GNN](https://github.com/XuSShuai/GNN_tensorflow).
 
 ## 1 - About
 
