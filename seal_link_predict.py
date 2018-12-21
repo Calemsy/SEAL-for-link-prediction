@@ -226,10 +226,10 @@ def create_input_for_gnn(graphs_adj, labels, vertex_tags, node_size_list, sub_gr
         pickle.dump(data, f_out)
 
 
-def classifier(data_name):
+def classifier(data_name, epoch, learning_rate):
     print("use GNN...")
 
-    cmd = parse_args(data_name)
+    cmd = parse_args(data_name, epoch, learning_rate)
     _, prediction, scores, y_label = gnn(cmd)
     auc = metrics.roc_auc_score(y_true=y_label, y_score=scores)
     print("auc: %f." % (auc))
