@@ -4,11 +4,11 @@ from gnn import create_input, split_train_test, train
 import numpy as np
 
 
-def parse_args(data_name="mutag", epoch=100):
+def parse_args(data_name="mutag", epoch=100, learning_rate=0.00001):
     parser = argparse.ArgumentParser(description="GNN(graph neural network)-tensorflow")
     parser.add_argument("-d", "--data", type=str, help="name of data", default=data_name)
     parser.add_argument("-e", "--epoch", type=int, default=epoch, help="pass through all training set call a EPOCH")
-    parser.add_argument("-r", "--learning_rate", type=float, default=0.00001, help="learning rate")
+    parser.add_argument("-r", "--learning_rate", type=float, default=learning_rate, help="learning rate")
     parser.add_argument("-k", "--top_k", type=int, default=60, help="for sort pooling layer to cut nodes")
     args = parser.parse_args()
     return args
