@@ -38,9 +38,9 @@ you can check out the other options available to use `python main.py --help`
 
 ## 4 - Result
 
-|Data| USAir | Celegans | Power |
-|:-----:|:-----:|:-----:|:-----:|
-|#Node         |332    |297    |4941|
-|#Edges        |2126   |2148   |6594|
-|Average Degree|12.8072|14.4646|2.6691|
-|SEAL(**auc**)     |**0.9538**|**0.8979**|**0.8889**|
+|Data| USAir | Celegans | Power | Yeast |
+|:-----:|:-----:|:-----:|:-----:|:-----:|
+|#Node         |332    |297    |4941| 2375 |
+|#Edges        |2126   |2148   |6594| 11693 |
+|Average Degree|12.8072|14.4646|2.6691|9.8467|
+|SEAL(**auc**)     |**0.9538**|**0.8979**|**0.8889**|**0.9714**|
