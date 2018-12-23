@@ -1,6 +1,6 @@
 # SEAL for link prediction
 
-`SEAL, a link prediction framework based on` [GNN](https://github.com/XuSShuai/GNN_tensorflow).
+SEAL, a link prediction framework based on [GNN](https://github.com/XuSShuai/GNN_tensorflow).
 
 ## 1 - About
 
@@ -24,9 +24,11 @@ and network embedding algorithms.
 
 #### 3.1 - Example
 
-Type the following command to run `seal` on data `USAir`.
+Type the following command to run `seal` on data 'USAir'.
 
-`python main.py`
+```python
+python main.py
+```
 
 #### 3.2 - Option
 
