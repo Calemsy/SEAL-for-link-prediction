@@ -22,7 +22,7 @@ def seal():
         link2subgraph(positive, negative, nodes_size, args.test_ratio, args.hop, args.network_type)
     create_input_for_gnn(graphs_adj, labels, vertex_tags, node_size_list,
                          sub_graph_nodes, embedding_feature, None, args.data)
-    classifier(args.data, args.epoch, args.learning_rate)
+    classifier(args.data, args.epoch, args.learning_rate, args.network_type)
 
 
 if __name__ == "__main__":
