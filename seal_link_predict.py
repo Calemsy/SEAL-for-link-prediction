@@ -93,7 +93,8 @@ def link2subgraph(positive, negative, nodes_size, test_ratio, hop, network_type)
 
     A = np.zeros([nodes_size, nodes_size])
     A[train_pos[:, 0], train_pos[:, 1]] = 1.0
-    A[train_pos[:, 1], train_pos[:, 0]] = 1.0
+    if network_type == 0:
+        A[train_pos[:, 1], train_pos[:, 0]] = 1.0
 
     def calculate_auc(scores, test_pos, test_neg):
         pos_scores = scores[test_pos[:, 0], test_pos[:, 1]]
