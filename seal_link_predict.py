@@ -229,7 +229,6 @@ def create_input_for_gnn(graphs_adj, labels, vertex_tags, node_size_list, sub_gr
 
 def classifier(data_name, epoch, learning_rate, is_directed):
     print("use GNN...")
-
     cmd = parse_args(data_name, epoch, learning_rate, is_directed)
     _, prediction, scores, y_label = gnn(cmd)
     auc = metrics.roc_auc_score(y_true=y_label, y_score=scores)
