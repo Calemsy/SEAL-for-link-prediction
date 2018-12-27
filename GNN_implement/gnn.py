@@ -27,7 +27,7 @@ def create_input(data, directed):
         A_tilde.append(np.zeros([nodes_size_list[index], nodes_size_list[index]], dtype=np.float32))
         for edge in graph:
             A_tilde[count][edge[0] - offset][edge[1] - offset] = 1.
-            if directed is False:
+            if directed == 0:
                 A_tilde[count][edge[1] - offset][edge[0] - offset] = 1.
         count += 1
     Y = np.where(np.reshape(labels, [-1, 1]) == 1, 1, 0)
