@@ -172,7 +172,8 @@ def extract_subgraph(node_pair, G, A, hop, network_type):
             sub_graph_nodes = sub_graph_nodes.union(neighbors)
         nodes = sub_graph_nodes - nodes
     sub_graph_nodes.remove(node_pair[0])
-    sub_graph_nodes.remove(node_pair[1])
+    if node_pair[0] != node_pair[1]:
+        sub_graph_nodes.remove(node_pair[1])
     sub_graph_nodes = [node_pair[0], node_pair[1]] + list(sub_graph_nodes)
     sub_graph_adj = A[sub_graph_nodes, :][:, sub_graph_nodes]
     sub_graph_adj[0][1] = sub_graph_adj[1][0] = 0.
