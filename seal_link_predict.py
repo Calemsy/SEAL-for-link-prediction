@@ -10,6 +10,7 @@ from gensim.models import Word2Vec
 import pickle
 from operator import itemgetter
 from tqdm import tqdm
+import gc
 
 
 def load_data(data_name, network_type):
@@ -76,7 +77,7 @@ def learning_embedding(positive, negative, network_size, test_ratio, dimension, 
     return embedding_feature
 
 
-def link2subgraph(positive, negative, nodes_size, test_ratio, hop, network_type):
+def link2subgraph(positive, negative, nodes_size, test_ratio, hop, network_type, max_neighbors=200):
     """
     :param positive: ndarray, from 'load_data', all positive edges
     :param negative: ndarray, from 'load_data', all negative edges
@@ -84,6 +85,7 @@ def link2subgraph(positive, negative, nodes_size, test_ratio, hop, network_type)
     :param test_ratio: float, scalar, proportion of the test set 
     :param hop: option: 0, 1, 2, ..., or 'auto'
     :param network_type: directed or undirected
+    :param max_neighbors: 
     :return: 
     """
     print("extract enclosing subgraph...")
@@ -91,10 +93,10 @@ def link2subgraph(positive, negative, nodes_size, test_ratio, hop, network_type)
     train_pos, test_pos = positive[:-test_size], positive[-test_size:]
     train_neg, test_neg = negative[:-test_size], negative[-test_size:]
 
-    A = np.zeros([nodes_size, nodes_size])
-    A[train_pos[:, 0], train_pos[:, 1]] = 1.0
+    A = np.zeros([nodes_size, nodes_size], dtype=np.uint8)
+    A[train_pos[:, 0], train_pos[:, 1]] = 1
     if network_type == 0:
-        A[train_pos[:, 1], train_pos[:, 0]] = 1.0
+        A[train_pos[:, 1], train_pos[:, 0]] = 1
 
     def calculate_auc(scores, test_pos, test_neg):
         pos_scores = scores[test_pos[:, 0], test_pos[:, 1]]
@@ -124,18 +126,19 @@ def link2subgraph(positive, negative, nodes_size, test_ratio, hop, network_type)
             print("aa(second order heuristic): %f > cn(first order heuristic) %f. " % (aa_auc, cn_auc))
             hop = 2
 
-    print("hop = %d." % hop)
+    print("hop = %s." % hop)
 
     # extract the subgraph for (positive, negative)
     G = nx.Graph() if network_type == 0 else nx.DiGraph()
-    G.add_nodes_from(set(sum(positive.tolist(), [])) | set(sum(negative.tolist(), [])))
+    G.add_nodes_from(set(positive[:, 0]) | set(positive[:, 1]) | set(negative[:, 0]) | set(negative[:, 1]))
+    # G.add_nodes_from(set(sum(positive.tolist(), [])) | set(sum(negative.tolist(), [])))
     G.add_edges_from(train_pos)
 
     graphs_adj, labels, vertex_tags, node_size_list, sub_graphs_nodes = [], [], [], [], []
     for graph_label, data in enumerate([negative, positive]):
         print("for %s. " % "negative" if graph_label == 0 else "positive")
         for node_pair in tqdm(data):
-            sub_nodes, sub_adj, vertex_tag = extract_subgraph(node_pair, G, A, hop, network_type)
+            sub_nodes, sub_adj, vertex_tag = extract_subgraph(node_pair, G, A, hop, network_type, max_neighbors)
             graphs_adj.append(sub_adj)
             vertex_tags.append(vertex_tag)
             node_size_list.append(len(vertex_tag))
@@ -143,34 +146,46 @@ def link2subgraph(positive, negative, nodes_size, test_ratio, hop, network_type)
     assert len(graphs_adj) == len(vertex_tags) == len(node_size_list)
     labels = np.concatenate([np.zeros(len(negative)), np.ones(len(positive))]).reshape(-1, 1)
 
-    vertex_set = list(set(sum(vertex_tags, [])))
-    if set(range(len(vertex_set))) != set(vertex_set):
-        vertex_map = dict([(x, vertex_set.index(x)) for x in vertex_set])
-        for index, graph_tag in enumerate(vertex_tags):
+    # vertex_tags_set = list(set(sum(vertex_tags, [])))
+    vertex_tags_set = set()
+    for tags in vertex_tags:
+        vertex_tags_set = vertex_tags_set.union(set(tags))
+    vertex_tags_set = list(vertex_tags_set)
+    print("tight the vertices tags.")
+    if set(range(len(vertex_tags_set))) != set(vertex_tags_set):
+        vertex_map = dict([(x, vertex_tags_set.index(x)) for x in vertex_tags_set])
+        for index, graph_tag in tqdm(enumerate(vertex_tags)):
             vertex_tags[index] = list(itemgetter(*graph_tag)(vertex_map))
     return graphs_adj, labels, vertex_tags, node_size_list, sub_graphs_nodes
 
 
-def extract_subgraph(node_pair, G, A, hop, network_type):
+def extract_subgraph(node_pair, G, A, hop, network_type, max_neighbors):
     """
     :param node_pair:  (vertex_start, vertex_end)
     :param G:  nx object from the positive edges
     :param A:  equivalent to the G, adj matrix of G
     :param hop:
     :param network_type:
+    :param max_neighbors: 
     :return: 
         sub_graph_nodes: use for select the embedding feature
         sub_graph_adj: adjacent matrix of the enclosing sub-graph
         vertex_tag: node type information from the labeling algorithm
     """
     sub_graph_nodes = set(node_pair)
-    nodes = set(node_pair)
+    nodes = list(node_pair)
 
     for i in range(int(hop)):
+        np.random.shuffle(nodes)
         for node in nodes:
-            neighbors = nx.neighbors(G, node)
-            sub_graph_nodes = sub_graph_nodes.union(neighbors)
-        nodes = sub_graph_nodes - nodes
+            neighbors = list(nx.neighbors(G, node))
+            if len(sub_graph_nodes) + len(neighbors) < max_neighbors:
+                sub_graph_nodes = sub_graph_nodes.union(neighbors)
+            else:
+                np.random.shuffle(neighbors)
+                sub_graph_nodes = sub_graph_nodes.union(neighbors[:max_neighbors - len(sub_graph_nodes)])
+                break
+        nodes = sub_graph_nodes - set(nodes)
     sub_graph_nodes.remove(node_pair[0])
     if node_pair[0] != node_pair[1]:
         sub_graph_nodes.remove(node_pair[1])
@@ -226,6 +241,8 @@ def create_input_for_gnn(graphs_adj, labels, vertex_tags, node_size_list, sub_gr
     print("write to ./data/" + data_name + ".txt")
     with open("./data/" + data_name + ".txt", "wb") as f_out:
         pickle.dump(data, f_out)
+    del data
+    gc.collect()
 
 
 def classifier(data_name, epoch, learning_rate, is_directed) -> float:
