@@ -2,6 +2,7 @@ import time
 import tensorflow as tf
 from load_raw_data import *
 from tqdm import tqdm
+from sklearn import metrics
 
 
 GRAPH_CONV_LAYER_CHANNEL = 32
@@ -230,7 +231,9 @@ def train(X_train, D_inverse_train, A_tilde_train, Y_train, nodes_size_list_trai
                 mean_value, var_value, max_value, min_value = sess.run([var_mean, var_variance, var_max, var_min], feed_dict=feed_dict)
                 print("\t\tdebug: mean: %f, variance: %f, max: %f, min: %f." %
                       (mean_value, var_value, max_value, min_value))
-            print("After %5s epoch, the loss is %f, training acc %f, test acc %f." % (epoch, loss_value, train_acc, test_acc))
+            print("After %5s epoch, the loss is %f, training acc %f, test acc %f, auc is %f."
+                  % (epoch, loss_value, train_acc, test_acc, metrics.roc_auc_score(y_true=np.squeeze(Y_test), y_score=np.squeeze(scores))))
+
             # saver.save(sess, os.path.join(MODEL_SAVE_PATH, data_name, MODEL_SAVE_NAME), global_step)
         end_t = time.time()
         print("time consumption: ", end_t - start_t)
