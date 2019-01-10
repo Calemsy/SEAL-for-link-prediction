@@ -20,7 +20,7 @@ and network embedding algorithms.
  - tensorflow 1.7.0</br>
  - numpy 1.14.2</br>
 
-## 3 - Baisc Usage
+## 3 - Basic Usage
 
 #### 3.1 - Example
 
@@ -35,7 +35,7 @@ python main.py
  - `python main.py --data Celegans` to run `SEAL` on data `Celegans`
  - `python main.py --epoch 200` will assign the number of epochs to 200, default value is 100
  - `python main.py -r 0.00001` will set the learning rate which determine the speed of update parameters to 0.00001.
- 
+
 you can check out the other options available to use `python main.py --help`
 
 ## 4 - Result
