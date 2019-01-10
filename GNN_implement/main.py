@@ -35,8 +35,7 @@ def gnn(args):
                      args.top_k, initial_feature_dimension,
                      learning_rate[args.data] if args.learning_rate is None else args.learning_rate,
                      args.epoch, args.data)
-    return test_acc, np.squeeze(prediction), np.squeeze(pos_scores), np.squeeze(Y_test)
-
+    print("test acc is: ", test_acc)
 
 def main():
     args = parse_args()
