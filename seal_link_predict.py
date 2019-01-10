@@ -1,16 +1,15 @@
 from sys import path
 path.append(r'./GNN_implement/')
 from GNN_implement.main import parse_args, gnn
+from GNN_implement.gnn import split_train_test, train
 path.append(r"./node2vec/src/")
 import numpy as np
 import networkx as nx
 from sklearn import metrics
 import node2vec
 from gensim.models import Word2Vec
-import pickle
 from operator import itemgetter
 from tqdm import tqdm
-import gc
 
 
 def load_data(data_name, network_type):
@@ -77,7 +76,7 @@ def learning_embedding(positive, negative, network_size, test_ratio, dimension, 
     return embedding_feature
 
 
-def link2subgraph(positive, negative, nodes_size, test_ratio, hop, network_type, max_neighbors=200):
+def link2subgraph(positive, negative, nodes_size, test_ratio, hop, network_type, max_neighbors=100):
     """
     :param positive: ndarray, from 'load_data', all positive edges
     :param negative: ndarray, from 'load_data', all negative edges
@@ -144,19 +143,20 @@ def link2subgraph(positive, negative, nodes_size, test_ratio, hop, network_type,
             node_size_list.append(len(vertex_tag))
             sub_graphs_nodes.append(sub_nodes)
     assert len(graphs_adj) == len(vertex_tags) == len(node_size_list)
-    labels = np.concatenate([np.zeros(len(negative)), np.ones(len(positive))]).reshape(-1, 1)
+    labels = np.concatenate([np.zeros(len(negative), dtype=np.uint8), np.ones(len(positive), dtype=np.uint8)]).reshape(-1, 1)
 
     # vertex_tags_set = list(set(sum(vertex_tags, [])))
     vertex_tags_set = set()
     for tags in vertex_tags:
         vertex_tags_set = vertex_tags_set.union(set(tags))
     vertex_tags_set = list(vertex_tags_set)
+    tags_size = len(vertex_tags_set)
     print("tight the vertices tags.")
     if set(range(len(vertex_tags_set))) != set(vertex_tags_set):
         vertex_map = dict([(x, vertex_tags_set.index(x)) for x in vertex_tags_set])
         for index, graph_tag in tqdm(enumerate(vertex_tags)):
             vertex_tags[index] = list(itemgetter(*graph_tag)(vertex_map))
-    return graphs_adj, labels, vertex_tags, node_size_list, sub_graphs_nodes
+    return graphs_adj, labels, vertex_tags, node_size_list, sub_graphs_nodes, tags_size
 
 
 def extract_subgraph(node_pair, G, A, hop, network_type, max_neighbors):
@@ -191,7 +191,7 @@ def extract_subgraph(node_pair, G, A, hop, network_type, max_neighbors):
         sub_graph_nodes.remove(node_pair[1])
     sub_graph_nodes = [node_pair[0], node_pair[1]] + list(sub_graph_nodes)
     sub_graph_adj = A[sub_graph_nodes, :][:, sub_graph_nodes]
-    sub_graph_adj[0][1] = sub_graph_adj[1][0] = 0.
+    sub_graph_adj[0][1] = sub_graph_adj[1][0] = 0
 
     # labeling(coloring/tagging)
     vertex_tag = node_labeling(sub_graph_adj, network_type)
@@ -218,37 +218,79 @@ def node_labeling(graph_adj, network_type):
     return [1, 1] + tags
 
 
-def create_input_for_gnn(graphs_adj, labels, vertex_tags, node_size_list, sub_graphs_nodes,
-                         embedding_feature, explicit_feature, data_name):
-    # adj mat to edges list, for feed into the GNN
-    print("create input for gnn...")
-    graphs = []
-    for graph in graphs_adj:
-        x, y = np.where(np.triu(graph, 1))
-        graphs.append([z for z in zip(x, y)])
+def create_input_for_gnn_fly(graphs_adj, labels, vertex_tags, node_size_list, sub_graphs_nodes,
+                             embedding_feature, explicit_feature, tags_size):
+    print("create input for gnn on fly, (skipping I/O operation)")
+    # graphs, nodes_size_list, labels = data["graphs"], data["nodes_size_list"], data["labels"]
 
-    sub_graph_emb = []
-    for sub_nodes in sub_graphs_nodes:
-        sub_graph_emb.append(embedding_feature[sub_nodes])
+    # 1 - prepare Y
+    Y = np.where(np.reshape(labels, [-1, 1]) == 1, 1, 0)
+    print("positive examples: %d, negative examples: %d." % (np.sum(Y == 0), np.sum(Y == 1)))
+    # 2 - prepare A_title
+    # graphs_adj is A_title in the formular of Graph Convolution layer
+    # add eye to A_title
+    for index, x in enumerate(graphs_adj):
+        graphs_adj[index] = x + np.eye(x.shape[0], dtype=np.uint8)
+    # 3 - prepare D_inverse
+    D_inverse = []
+    for x in graphs_adj:
+        D_inverse.append(np.linalg.inv(np.diag(np.sum(x, axis=1))))
+    # 4 - prepare X
+    X, initial_feature_channels = [], 0
 
-    data = {"graphs": np.array(graphs),
-            "labels": labels,
-            "nodes_size_list": node_size_list,
-            "vertex_tag": vertex_tags,
-            "index_from": 0,
-            "feature": np.array(sub_graph_emb)
-            }
-    print("write to ./data/" + data_name + ".txt")
-    with open("./data/" + data_name + ".txt", "wb") as f_out:
-        pickle.dump(data, f_out)
-    del data
-    gc.collect()
+    def convert_to_one_hot(y, C):
+        return np.eye(C, dtype=np.uint8)[y.reshape(-1)]
+
+    if vertex_tags is not None:
+        initial_feature_channels = tags_size
+        print("X: one-hot vertex tag, tag size %d." % initial_feature_channels)
+        for tag in vertex_tags:
+            x = convert_to_one_hot(np.array(tag), initial_feature_channels)
+            X.append(x)
+    else:
+        print("X: normalized node degree.")
+        for graph in graphs_adj:
+            degree_total = np.sum(graph, axis=1)
+            X.append(np.divide(degree_total, np.sum(degree_total)).reshape(-1, 1))
+        initial_feature_channels = 1
+    X = np.array(X)
+    if embedding_feature is not None:
+        print("embedding feature has considered")
+        # build embedding for enclosing sub-graph
+        sub_graph_emb = []
+        for sub_nodes in sub_graphs_nodes:
+            sub_graph_emb.append(embedding_feature[sub_nodes])
+        for i in range(len(X)):
+            X[i] = np.concatenate([X[i], sub_graph_emb[i]], axis=1)
+        initial_feature_channels = len(X[0][0])
+    if explicit_feature is not None:
+        initial_feature_channels = len(X[0][0])
+        pass
+    print("so, initial feature channels: ", initial_feature_channels)
+    return np.array(D_inverse), graphs_adj, Y, X, node_size_list, initial_feature_channels  # ps, graph_adj is A_title
 
 
-def classifier(data_name, epoch, learning_rate, is_directed) -> float:
-    print("use GNN...")
-    cmd = parse_args(data_name, epoch, learning_rate, is_directed)
-    _, prediction, scores, y_label = gnn(cmd)
-    auc = metrics.roc_auc_score(y_true=y_label, y_score=scores)
-    print("auc: %f." % (auc))
+def classifier(data_name, is_directed, test_ratio, dimension, hop, learning_rate, top_k=60, epoch=100):
+    positive, negative, nodes_size = load_data(data_name, is_directed)
+    embedding_feature = learning_embedding(positive, negative, nodes_size, test_ratio, dimension, is_directed)
+    graphs_adj, labels, vertex_tags, node_size_list, sub_graphs_nodes, tags_size = \
+        link2subgraph(positive, negative, nodes_size, test_ratio, hop, is_directed)
+
+    D_inverse, A_tilde, Y, X, nodes_size_list, initial_feature_dimension = create_input_for_gnn_fly(
+        graphs_adj, labels, vertex_tags, node_size_list, sub_graphs_nodes, embedding_feature, None, tags_size)
+    D_inverse_train, D_inverse_test, A_tilde_train, A_tilde_test, X_train, X_test, Y_train, Y_test, \
+    nodes_size_list_train, nodes_size_list_test = split_train_test(D_inverse, A_tilde, X, Y, nodes_size_list)
+
+    print("data set: ", data_name)
+    print("show configure for gnn.")
+    print("number of enclosing sub-graph is: ", len(graphs_adj))
+    print("size of vertices tags is: ", tags_size)
+    print("in all enclosing sub-graph, max nodes is %d, min nodes is %d, average node is %.2d." % (
+        np.max(node_size_list), np.min(node_size_list), np.average(node_size_list)))
+
+    test_acc, prediction, pos_scores = train(X_train, D_inverse_train, A_tilde_train, Y_train, nodes_size_list_train,
+                     X_test, D_inverse_test, A_tilde_test, Y_test, nodes_size_list_test,
+                     top_k, initial_feature_dimension, learning_rate, epoch)
+    auc = metrics.roc_auc_score(y_true=np.squeeze(Y_test), y_score=np.squeeze(pos_scores))
+    print("auc: %f" % auc)
     return auc
