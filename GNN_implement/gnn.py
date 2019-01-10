@@ -25,11 +25,11 @@ def create_input(data, directed):
 
     A_tilde, count = [], 0
     for index, graph in enumerate(graphs):
-        A_tilde.append(np.zeros([nodes_size_list[index], nodes_size_list[index]], dtype=np.float32))
+        A_tilde.append(np.zeros([nodes_size_list[index], nodes_size_list[index]], dtype=np.uint8))
         for edge in graph:
-            A_tilde[count][edge[0] - offset][edge[1] - offset] = 1.
+            A_tilde[count][edge[0] - offset][edge[1] - offset] = 1
             if directed == 0:
-                A_tilde[count][edge[1] - offset][edge[0] - offset] = 1.
+                A_tilde[count][edge[1] - offset][edge[0] - offset] = 1
         count += 1
     Y = np.where(np.reshape(labels, [-1, 1]) == 1, 1, 0)
     print("positive examples: %d, negative examples: %d." % (np.sum(Y == 0), np.sum(Y == 1)))
